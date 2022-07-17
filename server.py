@@ -8,6 +8,9 @@ import machine
 from httpParser import HttpParser
 
 displayController = displayController.DisplayController()
+buzzer = machine.PWM(machine.Pin(16))
+buzzer.freq(500)
+
 
 def connect():
     wlan = network.WLAN(network.STA_IF)
@@ -57,13 +60,21 @@ def webpage(temperature, state):
             <input type="submit" name="submit" id="submit"/>
             </form>
 
-            <p>LED is {state}</p>
-            <p>Temperature is {temperature}</p>
+            <p>CPU temperature is {temperature}</p>
 
             </body>
             </html>
             """
     return str(html)
+
+def buzz():
+    buzzer.duty_u16(1000)
+    sleep(0.2)
+    buzzer.duty_u16(0)
+    sleep(0.1)
+    buzzer.duty_u16(1000)
+    sleep(0.2)
+    buzzer.duty_u16(0)
 
 def serve(connection):
     state = 'OFF'
@@ -84,8 +95,12 @@ def serve(connection):
             msg = msg.replace('%3F','?')
             msg = msg.replace('%21','!')
             msg = msg.replace('%2C',',')
-            print(rawMsg[0].split('=')[0])
+            msg = msg.replace('%3A', ':')
+            msg = msg.replace('%E4', 'ä')
+            #print(rawMsg[0].split('=')[0])
+            print(username+": "+msg)
             if(rawMsg[0].split('=')[0] == '/?username'): # quick hack to sort out random unrelated requests
+                buzz()
                 displayController.add_message(msg,username)
         except IndexError:
             pass 
