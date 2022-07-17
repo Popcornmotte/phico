@@ -16,40 +16,53 @@ RST = const(14)
 
 SCR_WIDTH = const(320)
 SCR_HEIGHT = const(240)
-SCR_ROT = const(2)
+SCR_ROT = const(1)
 CENTER_Y = int(SCR_WIDTH/2)
 CENTER_X = int(SCR_HEIGHT/2)
 
-# PROBABLY NEED TO PACK ALL THIS INTO A CLASS
+
 
 fonts = [glcdfont,tt14,tt24]
-text = 'Hello Raspberry Pi Pico/ili9341'
 
-#print(text)
+class Message:
+    def __init__(self,msg,username):
+        self.msg = msg
+        self.username = username
 
-
-spi = SPI(
-    0,
-    baudrate=40000000,
-    miso=Pin(MISO),
-    mosi=Pin(MOSI),
-    sck=Pin(CLK))
-print(spi)
-
-display = ILI9341(
-    spi,
-    cs=Pin(13),
-    dc=Pin(DC),
-    rst=Pin(RST),
-    w=SCR_WIDTH,
-    h=SCR_HEIGHT,
-    r=SCR_ROT)
-
-display.erase()
-display.set_pos(0,0)
-
-
-for ff in fonts:
-    display.set_font(ff)
-    display.print(text)
-    sleep(1)
+class DisplayController:
+    spi = SPI(
+            0,
+            baudrate=40000000,
+            miso=Pin(MISO),
+            mosi=Pin(MOSI),
+            sck=Pin(CLK))
+    
+    display = ILI9341(
+            spi,
+            cs=Pin(13),
+            dc=Pin(DC),
+            rst=Pin(RST),
+            w=SCR_WIDTH,
+            h=SCR_HEIGHT,
+            r=SCR_ROT)
+    
+    queue = []
+    
+    def __init__(self):
+        self.display.erase()
+        self.display.set_pos(0,0)
+        self.display.set_font(fonts[2])
+        self.display.print("Messages empty")
+    
+    def refresh(self):
+        self.display.erase()
+        self.display.set_pos(0,0)
+        for msg in self.queue:
+            self.display.write(msg.username+": "+msg.msg+"\n")
+    
+    def add_message(self,msg,username):
+        if len(self.queue) >= 3:
+            self.queue.pop(0)
+        
+        self.queue.append(Message(msg[:100],username[:16]))
+        self.refresh()
