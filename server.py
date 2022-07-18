@@ -114,7 +114,7 @@ def serve(connection):
             rawUsername = rawMsg[0].split('=')
             username = rawUsername[1]
             msg = rawMsg[1].split('=')[1]
-            rep = {"+":' ', '%3F':'?', '%21':'!', '%2C':',','%3A': ':'}
+            rep = {"+":' ','%3F':'?','%21':'!','%2C':',','%3A': ':','%29':')','%28':'('}
             msg = multiple_replace(msg,rep)
             print(username+": "+msg)
             if(rawUsername[0] == '/?username'): # quick hack to sort out random unrelated requests
