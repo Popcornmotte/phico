@@ -12,13 +12,15 @@ displayController = displayController.DisplayController()
 buzzer = machine.PWM(machine.Pin(16))
 buzzer.freq(500)
 
-button = machine.Pin(2, machine.Pin.IN,machine.Pin.PULL_UP)
-
 def buttonThread():
-    while True:
-        if not button.value():
-            displayController.pop_message()
-            sleep(1)
+    button = machine.Pin(2, machine.Pin.IN,machine.Pin.PULL_UP)
+    try:
+        while True:
+            if not button.value():
+                displayController.pop_message()
+                sleep(1)
+    except KeyboardInterrupt:
+        return
 
 def connect():
     wlan = network.WLAN(network.STA_IF)
@@ -61,13 +63,13 @@ def webpage(temperature, state):
             <html>
             <body>          
             <p>Hi, I am Phico, Phil's Pico-based messaging system.</p>
-            <p>You can leave him a message here.</p>
+            <p>You can leave him a message here. Each message will trigger a short cooldown.</p>
             <p>The input is restricted to ASCII (Well, most of it at least).</p>
             <form>
-            <label>Enter Username (max 16 chars)</label>
+            <label>Enter Username (max 10 chars)</label>
             <input type="text" name="username" id="username"/>
             <p></p>
-            <label>Enter Message (max 100 chars)</label>
+            <label>Enter Message (max 185 chars)</label>
             <input type="text" name="msg" id="msg"/>
             <input type="submit" name="submit" id="submit"/>
             </form>
@@ -88,6 +90,11 @@ def buzz():
     sleep(0.2)
     buzzer.duty_u16(0)
 
+def multiple_replace(s, rep_dict):
+    for i,j in rep_dict.items():
+        s = s.replace(i,j)
+    return s
+
 def serve(connection):
     state = 'OFF'
     pico_led.off()
@@ -95,32 +102,28 @@ def serve(connection):
     while True:
         client = connection.accept()[0]
         request = client.recv(1024)
+        #print("received request")
         request = str(request)
-        #result = HttpParser.parse(request)
-        #print(request)
-        try:
-            rawData = request.split()
-            rawMsg = rawData[1].split('&')
-            username = rawMsg[0].split('=')[1]
-            msg = rawMsg[1].split('=')[1]
-            msg = msg.replace('+',' ')
-            msg = msg.replace('%3F','?')
-            msg = msg.replace('%21','!')
-            msg = msg.replace('%2C',',')
-            msg = msg.replace('%3A', ':')
-            
-            #print(rawMsg[0].split('=')[0])
-            print(username+": "+msg)
-            if(rawMsg[0].split('=')[0] == '/?username'): # quick hack to sort out random unrelated requests
-                buzz()
-                displayController.add_message(msg,username)
-        except IndexError:
-            pass 
-        
         temperature = pico_temp_sensor.temp
         html = webpage(temperature, state)
         client.send(html)
         client.close()
+        try:           
+            rawData = request.split()
+            rawMsg = rawData[1].split('&')
+            rawUsername = rawMsg[0].split('=')
+            username = rawUsername[1]
+            msg = rawMsg[1].split('=')[1]
+            rep = {"+":' ', '%3F':'?', '%21':'!', '%2C':',','%3A': ':'}
+            msg = multiple_replace(msg,rep)
+            print(username+": "+msg)
+            if(rawUsername[0] == '/?username'): # quick hack to sort out random unrelated requests
+                buzz()
+                displayController.add_message(msg,username)
+        except IndexError:
+            pass
+            
+
 
 if __name__=="__main__":
     
