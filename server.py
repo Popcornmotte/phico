@@ -50,13 +50,6 @@ def connect():
         return wlan.ifconfig()[0]        
 
 
-def open_socket(ip):
-    address = (ip, 80)
-    connection = socket.socket()
-    connection.bind(address)
-    connection.listen(1)
-    return connection
-
 def webpage(temperature, state):
     html = f"""
             <!DOCTYPE html>
@@ -95,33 +88,51 @@ def multiple_replace(s, rep_dict):
         s = s.replace(i,j)
     return s
 
+def open_socket(ip):
+    address = (ip, 80) #socket.getaddrinfo(ip, 80)[0][-1]#(ip, 80)
+    print('opened socket ', str(address))
+    connection = socket.socket()
+    connection.settimeout(0)
+    connection.bind(address)
+    connection.listen(1)
+    return connection
+
 def serve(connection):
     state = 'OFF'
     pico_led.off()
     temperature = 0
     while True:
-        client = connection.accept()[0]
-        request = client.recv(1024)
-        #print("received request")
-        request = str(request)
-        temperature = pico_temp_sensor.temp
-        html = webpage(temperature, state)
-        client.send(html)
-        client.close()
-        try:           
-            rawData = request.split()
-            rawMsg = rawData[1].split('&')
-            rawUsername = rawMsg[0].split('=')
-            username = rawUsername[1]
-            msg = rawMsg[1].split('=')[1]
-            rep = {"+":' ','%3F':'?','%21':'!','%2C':',','%3A': ':','%29':')','%28':'('}
-            msg = multiple_replace(msg,rep)
-            print(username+": "+msg)
-            if(rawUsername[0] == '/?username'): # quick hack to sort out random unrelated requests
-                buzz()
-                displayController.add_message(msg,username)
-        except IndexError:
-            pass
+        try:
+            client = connection.accept()[0]
+            print('client connected from ',str(client))
+            request = client.recv(1024)
+            #print("received request")
+            request = str(request)
+            temperature = pico_temp_sensor.temp
+            html = webpage(temperature, state)
+            client.send('HTTP/1.0 200 OK\r\nContent-type: text/html\r\n\r\n')
+            client.send(html)
+            client.close()
+            try:           
+                rawData = request.split()
+                rawMsg = rawData[1].split('&')
+                rawUsername = rawMsg[0].split('=')
+                username = rawUsername[1]
+                msg = rawMsg[1].split('=')[1]
+                rep = {"+":' ','%3F':'?','%21':'!','%2C':',','%3A': ':','%29':')','%28':'('}
+                msg = multiple_replace(msg,rep)
+                print(username+": "+msg)
+                if(rawUsername[0] == '/?username'): # quick hack to sort out random unrelated requests
+                    buzz()
+                    displayController.add_message(msg,username)
+            except IndexError:
+                pass
+            
+        except OSError as e:
+            try:
+                client.close()
+            except NameError:
+                pass #fuck python
             
 
 
