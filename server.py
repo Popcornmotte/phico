@@ -5,12 +5,20 @@ import displayController
 from time import sleep
 from picozero import pico_temp_sensor, pico_led
 import machine
-from httpParser import HttpParser
+import _thread
+
 
 displayController = displayController.DisplayController()
 buzzer = machine.PWM(machine.Pin(16))
 buzzer.freq(500)
 
+button = machine.Pin(2, machine.Pin.IN,machine.Pin.PULL_UP)
+
+def buttonThread():
+    while True:
+        if not button.value():
+            displayController.pop_message()
+            sleep(1)
 
 def connect():
     wlan = network.WLAN(network.STA_IF)
@@ -20,7 +28,8 @@ def connect():
     if not wlan.isconnected():
         wlan.connect(SSID, PASSWORD)
         print(f'Trying to connect to {SSID}...')
-        for _ in range(10):
+        displayController.debugPrint(f'Trying to connect to {SSID}...')
+        for _ in range(7):
             if wlan.isconnected():
                 break
             counter += wait
@@ -28,9 +37,12 @@ def connect():
             sleep(wait)
         else:
             print('Connection attempt failed. Trying again.\n')
+            displayController.debugPrint('Connection attempt failed. Trying again in 3 seconds.\n')
+            sleep(3)
             return connect()
         ip = wlan.ifconfig()[0]
         print(f'Connected on {ip}')
+        displayController.debugPrint(f'Connected on {ip}')
         return wlan.ifconfig()[0]
     else:
         return wlan.ifconfig()[0]        
@@ -47,10 +59,10 @@ def webpage(temperature, state):
     html = f"""
             <!DOCTYPE html>
             <html>
-            <body>
-            
-            <p>Phico me! :)</p>
-            
+            <body>          
+            <p>Hi, I am Phico, Phil's Pico-based messaging system.</p>
+            <p>You can leave him a message here.</p>
+            <p>The input is restricted to ASCII (Well, most of it at least).</p>
             <form>
             <label>Enter Username (max 16 chars)</label>
             <input type="text" name="username" id="username"/>
@@ -96,7 +108,7 @@ def serve(connection):
             msg = msg.replace('%21','!')
             msg = msg.replace('%2C',',')
             msg = msg.replace('%3A', ':')
-            msg = msg.replace('%E4', 'ä')
+            
             #print(rawMsg[0].split('=')[0])
             print(username+": "+msg)
             if(rawMsg[0].split('=')[0] == '/?username'): # quick hack to sort out random unrelated requests
@@ -111,6 +123,8 @@ def serve(connection):
         client.close()
 
 if __name__=="__main__":
+    
+    button_thread = _thread.start_new_thread(buttonThread, ())
     
     try:
         ip = connect()
